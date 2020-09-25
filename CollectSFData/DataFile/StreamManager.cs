@@ -12,6 +12,11 @@ using System.Linq;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Text.Json;
+using System.Text.Unicode;
+using Kusto.Cloud.Platform.Utils;
+using System.ComponentModel;
+// https://github.com/GrabYourPitchforks/docs/blob/bf_obsoletion_docs/docs/standard/serialization/resolving-binaryformatter-obsoletion-errors.md
 
 namespace CollectSFData.DataFile
 {
@@ -117,7 +122,20 @@ namespace CollectSFData.DataFile
             Open();
             Log.Debug($"enter: memoryStream length: {_memoryStream.Length}");
             _memoryStream.Position = 0;
-            return new BinaryFormatter().Deserialize(_memoryStream) as IList<T>;
+            IList<T> list = default(IList<T>);
+
+            //TypeConverter converter = TypeDescriptor.GetConverter(typeof(T));
+
+            //BitConverter.GetBytes()
+            using (StreamReader reader = new StreamReader(_memoryStream))
+            //new BinaryFormatter().Serialize(_memoryStream, records);
+            //using (BinaryReader reader = new BinaryReader(_memoryStream))
+            {
+                list.Add((T)reader.ReadLine().Cast<T>());
+            }
+
+            return list;
+            //return new BinaryFormatter().Deserialize(_memoryStream) as IList<T>;
         }
 
         public IList<string> Read()
@@ -201,8 +219,21 @@ namespace CollectSFData.DataFile
             Log.Debug($"enter: record length: {records.Count}");
             _memoryStream = null;
             Open();
-            new BinaryFormatter().Serialize(_memoryStream, records);
-            return _memoryStream;
+            //TypeConverter converter = TypeDescriptor.GetConverter(typeof(T));
+            
+            //BitConverter.GetBytes()
+            using (StreamWriter writer = new StreamWriter(_memoryStream))
+            //new BinaryFormatter().Serialize(_memoryStream, records);
+            //using (BinaryWriter writer = new BinaryWriter(_memoryStream))
+            {
+                foreach(T record in records)
+                {
+                    writer.Write(record);
+                    //writer.Write((byte[])converter.ConvertTo(record, typeof(byte[])));
+                }
+            }
+
+           return _memoryStream;
         }
 
         private MemoryStream Open()

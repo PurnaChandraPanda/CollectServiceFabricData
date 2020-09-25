@@ -26,6 +26,9 @@ namespace CollectSFData.Azure
 
         public bool Connect()
         {
+            TableContinuationToken tableToken = null;
+            CancellationToken cancellationToken = new CancellationToken();
+
             if (!Config.SasEndpointInfo.IsPopulated())
             {
                 Log.Warning("no table or token info. exiting:", Config.SasEndpointInfo);
@@ -36,7 +39,17 @@ namespace CollectSFData.Azure
             {
                 CloudTable table = new CloudTable(new Uri(Config.SasEndpointInfo.TableEndpoint + Config.SasEndpointInfo.SasToken));
                 _tableClient = table.ServiceClient;
-                TableList.AddRange(_tableClient.ListTables());
+
+                TableResultSegment tables = _tableClient.ListTablesSegmentedAsync(
+                    null,
+                    MaxResults,
+                    tableToken,
+                    new TableRequestOptions(),
+                    null,
+                    cancellationToken).Result;
+
+
+                TableList.AddRange(tables);
                 return true;
             }
             catch (Exception e)
@@ -159,7 +172,8 @@ namespace CollectSFData.Azure
             while (token != null)
             {
                 Log.Info($"querying table:{cloudTable.Name} total:{tableRecords}", query);
-                TableQuerySegment<DynamicTableEntity> tableSegment = cloudTable.ExecuteQuerySegmentedAsync(query, token, null, null).Result;
+                //TableQuerySegment<DynamicTableEntity> 
+                TableQuerySegment tableSegment = cloudTable.ExecuteQuerySegmentedAsync(query, token, null, null).Result;
                 token = tableSegment.ContinuationToken;
 
                 results = FormatRecordResults(cloudTable, tableSegment);
@@ -219,7 +233,7 @@ namespace CollectSFData.Azure
             }
         }
 
-        private List<CsvTableRecord> FormatRecordResults(CloudTable cloudTable, TableQuerySegment<DynamicTableEntity> tableSegment)
+        private List<CsvTableRecord> FormatRecordResults(CloudTable cloudTable, TableQuerySegment tableSegment)
         {
             List<CsvTableRecord> results = new List<CsvTableRecord>();
 

@@ -5,6 +5,7 @@
 
 using CollectSFData.Common;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
+using Microsoft.IdentityModel.Clients.ActiveDirectory.Extensibility;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -71,7 +72,7 @@ namespace CollectSFData.Azure
                     AuthenticationResult = authContext.AcquireTokenAsync(resource,
                         _wellKnownClientId,
                         _replyUrl,
-                        new PlatformParameters(prompt)).Result;
+                        new PlatformParameters(prompt, null)).Result; // todo fix add ICustomWebUi interface implementation
                 }
 
                 BearerToken = AuthenticationResult.AccessToken;
@@ -110,7 +111,7 @@ namespace CollectSFData.Azure
 
                 if (throwOnError)
                 {
-                    throw e;
+                    throw;
                 }
 
                 IsAuthenticated = false;

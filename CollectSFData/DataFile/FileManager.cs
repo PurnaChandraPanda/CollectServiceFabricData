@@ -154,6 +154,7 @@ namespace CollectSFData.DataFile
             return new FileObjectCollection();
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "<Pending>")]
         public string RelogBlg(FileObject fileObject)
         {
             string outputFile = fileObject.FileUri + PerfCsvExtension;
