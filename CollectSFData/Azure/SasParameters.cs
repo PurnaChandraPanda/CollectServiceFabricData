@@ -4,7 +4,8 @@
 // ------------------------------------------------------------
 
 using System;
-using System.Web;
+using System.Net;
+
 
 namespace CollectSFData.Azure
 {
@@ -18,7 +19,7 @@ namespace CollectSFData.Azure
             {
                 string paramName = parameter.ToLower().Split('=')[0];
                 string encodedParamValue = parameter.Split('=')[1];
-                string paramValue = HttpUtility.UrlDecode(encodedParamValue);
+                string paramValue = WebUtility.UrlDecode(encodedParamValue);
 
                 if (paramName.Equals("api-version")) { ApiVersion = paramValue; }
                 if (paramName.Equals("sv")) { SignedVersion = paramValue; }
