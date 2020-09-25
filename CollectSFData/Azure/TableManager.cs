@@ -172,7 +172,6 @@ namespace CollectSFData.Azure
             while (token != null)
             {
                 Log.Info($"querying table:{cloudTable.Name} total:{tableRecords}", query);
-                //TableQuerySegment<DynamicTableEntity> 
                 TableQuerySegment tableSegment = cloudTable.ExecuteQuerySegmentedAsync(query, token, null, null).Result;
                 token = tableSegment.ContinuationToken;
 
