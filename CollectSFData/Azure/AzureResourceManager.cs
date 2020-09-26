@@ -20,7 +20,6 @@ namespace CollectSFData.Azure
 {
     public class AzureResourceManager : Instance
     {
-        private static TokenCache _tokenCache = new TokenCache();
         private readonly Uri _replyUrl = new Uri("urn:ietf:wg:oauth:2.0:oob");
         private string _baseAuthUrl = "https://login.microsoftonline.com/";
         private string _getSubscriptionRestUri = "https://management.azure.com/subscriptions/{subscriptionId}?api-version=2016-06-01";
@@ -34,10 +33,10 @@ namespace CollectSFData.Azure
 
         private IPublicClientApplication publicClientApp;
         private IConfidentialClientApplication confidentialClientApp;
-        private AuthenticationResult authenticationResult = default;
-        private List<string> scopes = new List<string>();
-        private List<string> defaultScope = new List<string>() { ".default" };
-        private string tenantId = "common";
+
+        public List<string> Scopes { get; set; } = new List<string>();
+        private List<string> _defaultScope = new List<string>() { ".default" };
+        private string _commonTenantId = "common";
 
         public AuthenticationResult AuthenticationResult { get; private set; }
 
@@ -68,19 +67,13 @@ namespace CollectSFData.Azure
 
             try
             {
-        //AuthenticationContext authContext = new AuthenticationContext(
-        //            _baseAuthUrl + (string.IsNullOrEmpty(Config.AzureTenantId) ? "common" : Config.AzureTenantId), _tokenCache);
+                //AuthenticationContext authContext = new AuthenticationContext(
+                //            _baseAuthUrl + (string.IsNullOrEmpty(Config.AzureTenantId) ? "common" : Config.AzureTenantId), _tokenCache);
 
-                if(string.IsNullOrEmpty(Config.AzureTenantId))
+                if (string.IsNullOrEmpty(Config.AzureTenantId))
                 {
-                    Config.AzureTenantId = tenantId;
+                    Config.AzureTenantId = _commonTenantId;
                 }
-
-                if(string.IsNullOrEmpty(Config.AzureClientId))
-                {
-                    Config.AzureClientId = _wellKnownClientId;
-                }
-
 
                 if (Config.IsClientIdConfigured())
                 {
@@ -102,8 +95,8 @@ namespace CollectSFData.Azure
                        .Build();
 
                     TokenCacheHelper.EnableSerialization(confidentialClientApp.UserTokenCache);
-                    authenticationResult = confidentialClientApp
-                        .AcquireTokenForClient(scopes.Count > 0 ? scopes : defaultScope)
+                    AuthenticationResult = confidentialClientApp
+                        .AcquireTokenForClient(Scopes.Count > 0 ? Scopes : _defaultScope)
                         .ExecuteAsync().Result;
 
                 }
@@ -116,26 +109,26 @@ namespace CollectSFData.Azure
                     //    new PlatformParameters(prompt, null)).Result; // todo fix add ICustomWebUi interface implementation
 
                     publicClientApp = PublicClientApplicationBuilder
-                        .Create(Config.AzureClientId)
+                        .Create(_wellKnownClientId)
                         .WithAuthority(AzureCloudInstance.AzurePublic, Config.AzureTenantId)
                         .WithLogging(MsalLoggerCallback, LogLevel.Verbose, true, true)
                         .WithDefaultRedirectUri()
                         .Build();
 
                     TokenCacheHelper.EnableSerialization(publicClientApp.UserTokenCache);
-                    authenticationResult = publicClientApp
-                        .AcquireTokenSilent(defaultScope, publicClientApp.GetAccountsAsync().Result.FirstOrDefault())
+                    AuthenticationResult = publicClientApp
+                        .AcquireTokenSilent(_defaultScope, publicClientApp.GetAccountsAsync().Result.FirstOrDefault())
                         .ExecuteAsync().Result;
 
 
                 }
 
 
-                if (scopes.Count > 0)
+                if (Scopes.Count > 0)
                 {
-                    Log.Info($"// adding scopes {scopes.Count}");
-                    authenticationResult = publicClientApp
-                        .AcquireTokenSilent(scopes, publicClientApp.GetAccountsAsync().Result.FirstOrDefault())
+                    Log.Info($"// adding scopes {Scopes.Count}");
+                    AuthenticationResult = publicClientApp
+                        .AcquireTokenSilent(Scopes, publicClientApp.GetAccountsAsync().Result.FirstOrDefault())
                         .ExecuteAsync().Result;
                 }
 
@@ -156,8 +149,8 @@ namespace CollectSFData.Azure
             }
             catch (MsalUiRequiredException)
             {
-                authenticationResult = publicClientApp
-                    .AcquireTokenInteractive(defaultScope)
+                AuthenticationResult = publicClientApp
+                    .AcquireTokenInteractive(_defaultScope)
                     .ExecuteAsync().Result;
                 return Authenticate(throwOnError, resource, true);
             }
@@ -194,7 +187,10 @@ namespace CollectSFData.Azure
 
         public void MsalLoggerCallback(LogLevel level, string message, bool containsPII)
         {
-            Log.Info($"// {level} {message}");
+            if (!containsPII | (containsPII & Config.LogDebug))
+            {
+                Log.Info($"{level} {message}");
+            }
         }
 
         public bool CheckResource(string resourceId)
