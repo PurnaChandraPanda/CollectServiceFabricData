@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
     <id>Microsoft.ServiceFabric.CollectSFData</id>
-    <version>$version$</version>
+    <version>1.0</version>
     <title>CollectSFData</title>
     <authors>Microsoft</authors>
     <owners></owners>
@@ -11,15 +11,18 @@
     <iconUrl>http://raw.githubusercontent.com/microsoft/CollectServiceFabricData/master/CollectSFData/FabricSupport.ico</iconUrl>
     <icon>images\FabricSupport.png</icon>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <description>.net framework console utility to manage service fabric support logs.</description>
+    <description>.net5 console utility to manage service fabric support logs.</description>
     <releaseNotes></releaseNotes>
     <copyright>© Microsoft Corporation. All rights reserved.</copyright>
     <tags>servicefabric</tags>
+    <dependencies>
+      <group targetFramework="net5" />
+    </dependencies>
   </metadata>
   <files>
-      <file src="bin\x64\$configuration$\*.dll" target="lib\net462" />
-      <file src="..\configurationFiles\collectsfdata.options.json" target="lib\net462" />
-      <file src="bin\x64\$configuration$\*.config" target="lib\net462" />
+      <file src="bin\$configuration$\*.dll" target="lib\net5" />
+      <file src="..\configurationFiles\collectsfdata.options.json" target="lib\net5" />
+      <file src="bin\$configuration$\*.config" target="lib\net5" />
       <file src="FabricSupport.png" target="images\" />
   </files>
 </package>
