@@ -4,10 +4,7 @@
 // ------------------------------------------------------------
 
 using CollectSFData.Common;
-using System.Security;
 using Microsoft.Identity.Client;
-//using Microsoft.IdentityModel.Clients.ActiveDirectory;
-//using Microsoft.IdentityModel.Clients.ActiveDirectory.Extensibility;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -20,8 +17,6 @@ namespace CollectSFData.Azure
 {
     public class AzureResourceManager : Instance
     {
-        private readonly Uri _replyUrl = new Uri("urn:ietf:wg:oauth:2.0:oob");
-        private string _baseAuthUrl = "https://login.microsoftonline.com/";
         private string _getSubscriptionRestUri = "https://management.azure.com/subscriptions/{subscriptionId}?api-version=2016-06-01";
         private Http _httpClient = Http.ClientFactory();
         private string _listSubscriptionsRestUri = "https://management.azure.com/subscriptions?api-version=2016-06-01";
@@ -67,9 +62,6 @@ namespace CollectSFData.Azure
 
             try
             {
-                //AuthenticationContext authContext = new AuthenticationContext(
-                //            _baseAuthUrl + (string.IsNullOrEmpty(Config.AzureTenantId) ? "common" : Config.AzureTenantId), _tokenCache);
-
                 if (string.IsNullOrEmpty(Config.AzureTenantId))
                 {
                     Config.AzureTenantId = _commonTenantId;
@@ -78,9 +70,6 @@ namespace CollectSFData.Azure
                 if (Config.IsClientIdConfigured())
                 {
                     // no prompt with clientid and secret
-                    //AuthenticationResult = authContext.AcquireTokenAsync(resource,
-                    //    new ClientCredential(Config.AzureClientId, Config.AzureClientSecret)).Result;
-
                     confidentialClientApp = ConfidentialClientApplicationBuilder
                        .CreateWithApplicationOptions(new ConfidentialClientApplicationOptions
                        {
@@ -96,9 +85,8 @@ namespace CollectSFData.Azure
 
                     TokenCacheHelper.EnableSerialization(confidentialClientApp.UserTokenCache);
                     AuthenticationResult = confidentialClientApp
-                        .AcquireTokenForClient(Scopes.Count > 0 ? Scopes : _defaultScope)
+                        .AcquireTokenForClient(_defaultScope)
                         .ExecuteAsync().Result;
-
                 }
                 else
                 {
@@ -119,20 +107,15 @@ namespace CollectSFData.Azure
                     AuthenticationResult = publicClientApp
                         .AcquireTokenSilent(_defaultScope, publicClientApp.GetAccountsAsync().Result.FirstOrDefault())
                         .ExecuteAsync().Result;
-
-
                 }
-
 
                 if (Scopes.Count > 0)
                 {
-                    Log.Info($"// adding scopes {Scopes.Count}");
+                    Log.Info($"adding scopes {Scopes.Count}");
                     AuthenticationResult = publicClientApp
                         .AcquireTokenSilent(Scopes, publicClientApp.GetAccountsAsync().Result.FirstOrDefault())
                         .ExecuteAsync().Result;
                 }
-
-
 
                 BearerToken = AuthenticationResult.AccessToken;
                 long tickDiff = ((AuthenticationResult.ExpiresOn.ToLocalTime().Ticks - DateTime.Now.Ticks) / 2) + DateTime.Now.Ticks;
@@ -160,10 +143,10 @@ namespace CollectSFData.Azure
 
                 if (ae.GetBaseException() is MsalException)
                 {
-                    MsalException ad = ae.GetBaseException() as MsalException;
-                    Log.Exception($"adal exception:{ad}");
+                    MsalException me = ae.GetBaseException() as MsalException;
+                    Log.Exception($"msal exception:{me}");
 
-                    if (ad.ErrorCode.Contains("interaction_required") && !prompt)
+                    if (me.ErrorCode.Contains("interaction_required") && !prompt)
                     {
                         return Authenticate(throwOnError, resource, true);
                     }
