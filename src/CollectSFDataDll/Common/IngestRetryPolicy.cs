@@ -3,14 +3,17 @@
 // Licensed under the MIT License (MIT). See License.txt in the repo root for license information.
 // ------------------------------------------------------------
 
-using Microsoft.Azure.Storage;
-using Microsoft.Azure.Storage.RetryPolicies;
+using Azure.Core;
+using Azure.Storage;
 using System;
 
 namespace CollectSFData.Common
 {
-    public class IngestRetryPolicy : Constants, IRetryPolicy
+    public class IngestRetryPolicy : ClientOptions
     {
+        private RetryOptions RetryOptions;
+
+        /*
         IRetryPolicy IRetryPolicy.CreateInstance()
         {
             return new IngestRetryPolicy();
@@ -28,5 +31,6 @@ namespace CollectSFData.Common
 
             return false;
         }
+        */
     }
 }

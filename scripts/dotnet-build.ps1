@@ -5,7 +5,7 @@
 #>
 param(
     [ValidateSet('net472', 'netcoreapp2.2', 'netcoreapp3.1', 'net5')]
-    [string[]]$targetFramework = @('net5'),
+    [string[]]$targetFramework = @('netcoreapp3.1','net472'),
     [ValidateSet('all', 'debug', 'release')]
     $configuration = 'all',
     [ValidateSet('win-x64', 'ubuntu.18.04-x64')]
@@ -56,6 +56,10 @@ function main() {
 }
 
 function build-configuration($configuration){
+
+    write-host "dotnet list package"
+    dotnet list package
+
     write-host "dotnet build $csproj -c $configuration" -ForegroundColor Magenta
     dotnet build $csproj -c $configuration
 
