@@ -85,6 +85,14 @@ namespace CollectSFData.Azure
                 return false;
             }
         }
+        private void AddContainerToList(CloudBlobContainer container)
+        {
+            if (!ContainerList.Any(x => x.Name.Equals(container.Name)))
+            {
+                Log.Info($"adding container to list:{container.Name}", ConsoleColor.Green);
+                ContainerList.Add(container);
+            }
+        }
 
         public void DownloadContainers(string containerPrefix = "")
         {
@@ -134,6 +142,25 @@ namespace CollectSFData.Azure
         {
             Log.Info($"enter:{container.Name}");
             DownloadBlobsFromContainer(container);
+        }
+
+        public void DownloadFiles(List<string> uris)
+        {
+            List<IListBlobItem> blobItems = new List<IListBlobItem>();
+
+            foreach (string uri in uris)
+            {
+                try
+                {
+                    blobItems.Add(_blobClient.GetBlobReferenceFromServer(new Uri(uri)));
+                }
+                catch (Exception e)
+                {
+                    Log.Exception($"{e}");
+                }
+            }
+
+            QueueBlobSegmentDownload(blobItems);
         }
 
         private IEnumerable<Page<BlobItem>> EnumerateContainerBlobs(BlobContainerItem container)
@@ -378,6 +405,18 @@ namespace CollectSFData.Azure
                 else
                 {
                     Log.Debug($"regex not matched: {blobClient.Uri} pattern: {FileFilterPattern}");
+                }
+
+                try
+                {
+                    Log.Debug($"file Blob: {blob.Uri}");
+                    blobRef = blob.Container.ServiceClient.GetBlobReferenceFromServerAsync(blob.Uri).Result;
+                }
+                catch (StorageException se)
+                {
+                    Interlocked.Increment(ref _instance.TotalErrors);
+                    Log.Exception($"getting ref for {blob.Uri}, skipping. {se.Message}");
+                    continue;
                 }
 
                 if (blob.Properties.LastModified.HasValue)

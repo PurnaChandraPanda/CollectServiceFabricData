@@ -4,7 +4,6 @@
 // ------------------------------------------------------------
 
 using CollectSFData.Common;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -18,9 +17,9 @@ namespace CollectSFData.DataFile
 {
     public class FileManager : Constants
     {
+        private readonly CustomTaskManager _fileTasks = new CustomTaskManager(true);
         private Instance _instance = Instance.Singleton();
         private ConfigurationOptions Config => _instance.Config;
-        private readonly CustomTaskManager _fileTasks = new CustomTaskManager(true);
 
         public static string NormalizePath(string path, string directorySeparator = "/")
         {
@@ -154,58 +153,6 @@ namespace CollectSFData.DataFile
 
             Log.Warning($"returning: empty fileObjectCollection for file: {fileObject.FileUri}");
             return new FileObjectCollection();
-        }
-
-        public string RelogBlg(FileObject fileObject)
-        {
-            string outputFile = fileObject.FileUri + PerfCsvExtension;
-
-            if (!(Config.FileType.Equals(FileTypesEnum.counter)))
-            {
-                return outputFile;
-            }
-
-            fileObject.Stream.SaveToFile();
-            string csvParams = fileObject.FileUri + " -f csv -o " + outputFile;
-            DeleteFile(outputFile);
-
-            Log.Info($"Writing {outputFile}");
-            Log.Info($"relog.exe {csvParams}");
-            ProcessStartInfo startInfo = new ProcessStartInfo("relog.exe", csvParams)
-            {
-                CreateNoWindow = true,
-                UseShellExecute = false,
-                RedirectStandardError = true,
-                RedirectStandardOutput = true,
-                LoadUserProfile = false,
-            };
-
-            Process convertFileProc = Process.Start(startInfo);
-
-            if (!convertFileProc.HasExited)
-            {
-                if (convertFileProc.StandardOutput.Peek() > -1)
-                {
-                    Log.Info($"{convertFileProc.StandardOutput.ReadToEnd()}");
-                }
-
-                if (convertFileProc.StandardError.Peek() > -1)
-                {
-                    Log.Error($"{convertFileProc.StandardError.ReadToEnd()}");
-                }
-            }
-
-            convertFileProc.WaitForExit();
-            _instance.TotalFilesConverted++;
-            fileObject.Stream.ReadFromFile(outputFile);
-            DeleteFile(outputFile);
-
-            if (Config.UseMemoryStream | !Config.IsCacheLocationPreConfigured())
-            {
-                DeleteFile(fileObject.FileUri);
-            }
-
-            return outputFile;
         }
 
         private void DeleteFile(string fileUri)
@@ -346,7 +293,7 @@ namespace CollectSFData.DataFile
                 }
 
                 Log.Debug($"finished format:{fileObject.FileUri}");
-            
+
                 fileObject.Stream.ResetPosition();
                 fileObject.Stream.Write(records);
                 return PopulateCollection<DtrTraceRecord>(fileObject);
@@ -358,7 +305,7 @@ namespace CollectSFData.DataFile
             }
         }
 
-        private FileObjectCollection PopulateCollection<T>(FileObject fileObject)
+        private FileObjectCollection PopulateCollection<T>(FileObject fileObject) where T : IRecord
         {
             FileObjectCollection collection = new FileObjectCollection() { fileObject };
             _instance.TotalFilesFormatted++;
@@ -386,6 +333,58 @@ namespace CollectSFData.DataFile
             return collection;
         }
 
+        private string RelogBlg(FileObject fileObject)
+        {
+            string outputFile = fileObject.FileUri + PerfCsvExtension;
+
+            if (!(Config.FileType.Equals(FileTypesEnum.counter)))
+            {
+                return outputFile;
+            }
+
+            fileObject.Stream.SaveToFile();
+            string csvParams = fileObject.FileUri + " -f csv -o " + outputFile;
+            DeleteFile(outputFile);
+
+            Log.Info($"Writing {outputFile}");
+            Log.Info($"relog.exe {csvParams}");
+            ProcessStartInfo startInfo = new ProcessStartInfo("relog.exe", csvParams)
+            {
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                LoadUserProfile = false,
+            };
+
+            Process convertFileProc = Process.Start(startInfo);
+
+            if (!convertFileProc.HasExited)
+            {
+                if (convertFileProc.StandardOutput.Peek() > -1)
+                {
+                    Log.Info($"{convertFileProc.StandardOutput.ReadToEnd()}");
+                }
+
+                if (convertFileProc.StandardError.Peek() > -1)
+                {
+                    Log.Error($"{convertFileProc.StandardError.ReadToEnd()}");
+                }
+            }
+
+            convertFileProc.WaitForExit();
+            _instance.TotalFilesConverted++;
+            fileObject.Stream.ReadFromFile(outputFile);
+            DeleteFile(outputFile);
+
+            if (Config.UseMemoryStream | !Config.IsCacheLocationPreConfigured())
+            {
+                DeleteFile(fileObject.FileUri);
+            }
+
+            return outputFile;
+        }
+
         private void SaveToCache(FileObject fileObject, bool force = false)
         {
             try
@@ -401,7 +400,7 @@ namespace CollectSFData.DataFile
             }
         }
 
-        private FileObjectCollection SerializeCsv<T>(FileObject fileObject)
+        private FileObjectCollection SerializeCsv<T>(FileObject fileObject) where T : IRecord
         {
             Log.Debug("enter");
             FileObjectCollection collection = new FileObjectCollection() { fileObject };
@@ -410,17 +409,23 @@ namespace CollectSFData.DataFile
             string sourceFile = fileObject.FileUri.ToLower().Replace(CsvExtension, "");
             fileObject.FileUri = $"{sourceFile}{CsvExtension}";
             List<byte> csvSerializedBytes = new List<byte>();
+            string relativeUri = null;
 
             foreach (T record in fileObject.Stream.Read<T>())
             {
+                record.RelativeUri = relativeUri ?? record.RelativeUri;
                 byte[] recordBytes = Encoding.UTF8.GetBytes(record.ToString());
 
                 if (csvSerializedBytes.Count + recordBytes.Length > MaxCsvTransmitBytes)
                 {
+                    relativeUri = $"{sourceFile}.{counter}{CsvExtension}";
+                    record.RelativeUri = relativeUri;
+
+                    recordBytes = Encoding.UTF8.GetBytes(record.ToString());
                     fileObject.Stream.Set(csvSerializedBytes.ToArray());
                     csvSerializedBytes.Clear();
 
-                    fileObject = new FileObject($"{sourceFile}.{counter}{CsvExtension}", fileObject.BaseUri);
+                    fileObject = new FileObject(relativeUri, fileObject.BaseUri);
 
                     Log.Debug($"csv serialized size: {csvSerializedBytes.Count} file: {fileObject.FileUri}");
                     collection.Add(fileObject);
@@ -435,34 +440,37 @@ namespace CollectSFData.DataFile
             return collection;
         }
 
-        private FileObjectCollection SerializeJson<T>(FileObject fileObject)
+        private FileObjectCollection SerializeJson<T>(FileObject fileObject) where T : IRecord
         {
             Log.Debug("enter");
             string sourceFile = fileObject.FileUri.ToLower().Replace(JsonExtension, "");
             fileObject.FileUri = $"{sourceFile}{JsonExtension}";
             FileObjectCollection collection = new FileObjectCollection();
+            string relativeUri = null;
 
             if (fileObject.Length > MaxJsonTransmitBytes)
             {
                 FileObject newFileObject = new FileObject($"{sourceFile}", fileObject.BaseUri);
-                int recordsCount = 0;
+                int counter = 0;
 
                 foreach (T record in fileObject.Stream.Read<T>())
                 {
-                    recordsCount++;
+                    record.RelativeUri = relativeUri ?? record.RelativeUri;
+                    counter++;
 
                     if (newFileObject.Length < WarningJsonTransmitBytes)
                     {
-                        newFileObject.Stream.Write<T>(new List<T>{record}, true);
+                        newFileObject.Stream.Write<T>(new List<T> { record }, true);
                     }
-                    else{
-                        newFileObject.FileUri = $"{sourceFile}.{recordsCount}{JsonExtension}";
+                    else
+                    {
                         collection.Add(newFileObject);
-                        newFileObject = new FileObject($"{sourceFile}", fileObject.BaseUri);
+                        relativeUri = $"{sourceFile}.{counter}{JsonExtension}";
+                        newFileObject = new FileObject(relativeUri, fileObject.BaseUri);
                     }
                 }
 
-                newFileObject.FileUri = $"{sourceFile}.{recordsCount}{JsonExtension}";
+                newFileObject.FileUri = $"{sourceFile}.{counter}{JsonExtension}";
                 collection.Add(newFileObject);
             }
             else

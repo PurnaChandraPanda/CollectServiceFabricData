@@ -17,10 +17,10 @@ namespace CollectSFData.Azure
 {
     public class TableManager : Constants
     {
-        private Instance _instance = Instance.Singleton();
-        private ConfigurationOptions Config => _instance.Config;
         private readonly CustomTaskManager _tableTasks = new CustomTaskManager(true);
+        private Instance _instance = Instance.Singleton();
         private CloudTableClient _tableClient;
+        private ConfigurationOptions Config => _instance.Config;
         public Action<FileObject> IngestCallback { get; set; }
         public List<CloudTable> TableList { get; set; } = new List<CloudTable>();
 
@@ -70,7 +70,7 @@ namespace CollectSFData.Azure
                 try
                 {
                     Task<TableResultSegment> tableSegment = _tableClient.ListTablesSegmentedAsync(tablePrefix, MaxResults, token, null, null);
-                    Task<TableResultSegment> task = DownloadTablesSegmentAsync(tableSegment, Config.NodeFilter);
+                    Task<TableResultSegment> task = DownloadTablesSegment(tableSegment, Config.ContainerFilter);
 
                     token = task.Result.ContinuationToken;
                     resultsCount += task.Result.Results.Count;
@@ -147,16 +147,14 @@ namespace CollectSFData.Azure
             return clusterId;
         }
 
-        private async Task<TableResultSegment> DownloadTablesSegmentAsync(Task<TableResultSegment> tableSegment, string urlFilterPattern)
+        private Task<TableResultSegment> DownloadTablesSegment(Task<TableResultSegment> tableSegment, string urlFilterPattern)
         {
-            await tableSegment.ConfigureAwait(false);
-
             foreach (CloudTable cloudTable in tableSegment.Result.Results)
             {
                 _tableTasks.QueueTaskAction(() => EnumerateTableRecords(cloudTable, urlFilterPattern));
             }
 
-            return tableSegment.Result;
+            return tableSegment;
         }
 
         private IEnumerable<List<CsvTableRecord>> EnumerateTable(CloudTable cloudTable, int maxResults = TableMaxResults, bool limitResults = false)
@@ -178,7 +176,7 @@ namespace CollectSFData.Azure
 #endif
                 token = tableSegment.ContinuationToken;
 
-                results = FormatRecordResults(cloudTable, tableSegment);
+                results.AddRange(FormatRecordResults(cloudTable, tableSegment));
                 tableRecords += results.Count;
 
                 if (results.Count == 0)
@@ -205,7 +203,7 @@ namespace CollectSFData.Azure
 
         private void EnumerateTableRecords(CloudTable cloudTable, string urlFilterPattern)
         {
-            if (string.IsNullOrEmpty(urlFilterPattern) || Regex.IsMatch(cloudTable.Uri.ToString(), FileFilterPattern))
+            if (string.IsNullOrEmpty(urlFilterPattern) || Regex.IsMatch(cloudTable.Uri.ToString(), urlFilterPattern, RegexOptions.IgnoreCase))
             {
                 int chunkCount = 0;
 
@@ -222,7 +220,10 @@ namespace CollectSFData.Azure
                         continue;
                     }
 
-                    FileObject fileObject = new FileObject($"{cloudTable.Name}.{chunkCount++}{TableExtension}", Config.CacheLocation);
+                    string relativeUri = $"{Config.StartTimeUtc.Ticks}-{Config.EndTimeUtc.Ticks}-{cloudTable.Name}.{chunkCount++}{TableExtension}";
+                    FileObject fileObject = new FileObject(relativeUri, Config.CacheLocation);
+                    resultsChunk.ToList().ForEach(x => x.RelativeUri = relativeUri);
+
                     fileObject.Stream.Write(resultsChunk);
 
                     _instance.TotalFilesDownloaded++;
@@ -271,7 +272,7 @@ namespace CollectSFData.Azure
                         PartitionKey = result.PartitionKey,
                         RowKey = result.RowKey,
                         PropertyName = entity.Key,
-                        PropertyValue = entity.Value,
+                        PropertyValue = $"\"{entity.Value}\"",
                         RelativeUri = cloudTable.Name,
                         ResourceUri = Config.ResourceUri
                     });
