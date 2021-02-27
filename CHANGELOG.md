@@ -1,8 +1,22 @@
 # Change log
 
-## 01/30/2020
+## 02/22/2021
 
-- 2.8 
+- fix fields not matching in gathertype 'setup'. FormatTraceFile incorrectly using DtrTraceRecord instead of T. tested setup and trace gathertype
+
+
+## 02/08/2021
+
+- 2.8
+- fix gathertype table propertyvalue add quotes and replace " and ,
+- fix table duplicate cleanup RelativeUri
+- move table cleanup after Wait
+- add export kusto function script
+- exported current kusto functions  
+
+## 01/30/2021 https://github.com/microsoft/CollectServiceFabricData/releases/tag/v2.8.2101.1302111
+
+- 2.8
 - add System.Reactive dependency for Tx
 - add uris argument to UpdloadData()
 - modify PopulateConfig() to use GatherType to determine if configuration populated
