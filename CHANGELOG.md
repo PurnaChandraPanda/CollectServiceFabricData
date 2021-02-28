@@ -1,6 +1,38 @@
 # Change log
 
-## 12/27/2020 
+## 02/27/2021
+
+- adding net462 targetframework
+
+## 02/22/2021
+
+- fix fields not matching in gathertype 'setup'. FormatTraceFile incorrectly using DtrTraceRecord instead of T. tested setup and trace gathertype
+
+
+## 02/08/2021
+
+- 2.8
+- fix gathertype table propertyvalue add quotes and replace " and ,
+- fix table duplicate cleanup RelativeUri
+- move table cleanup after Wait
+- add export kusto function script
+- exported current kusto functions  
+
+## 01/30/2021 https://github.com/microsoft/CollectServiceFabricData/releases/tag/v2.8.2101.1302111
+
+- 2.8
+- add System.Reactive dependency for Tx
+- add uris argument to UpdloadData()
+- modify PopulateConfig() to use GatherType to determine if configuration populated
+- fix CheckLogFile to not check file if open
+- fix table name prepend to prevent duplicate
+- fix file name with multiple splits from concatenating counters in name
+- testing microsoft Tx module to replace relog.exe (UseTx=true) non-default
+- fix message compare for ingest causing no progress timeouts
+- fix db table cursor kql syntax
+- fix CSV compliance issue with Linux cluster tables  
+
+## 12/27/2020 https://github.com/microsoft/CollectServiceFabricData/releases/tag/v2.7.2012.31150827
 
 - add version check in LogSummary random 10% of time if logging to console  
 - fix aggregate collection modified exception in pending ingest list  

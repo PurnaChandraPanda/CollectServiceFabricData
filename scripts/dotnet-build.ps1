@@ -4,8 +4,8 @@
 
 #>
 param(
-    [ValidateSet('net472', 'netcoreapp2.2', 'netcoreapp3.1', 'net5')]
-    [string[]]$targetFramework = @('netcoreapp3.1','net472'),
+    [ValidateSet('net472', 'netcoreapp2.2', 'netcoreapp3.1', 'net5', 'net462')]
+    [string[]]$targetFramework = @('net5'),
     [ValidateSet('all', 'debug', 'release')]
     $configuration = 'all',
     [ValidateSet('win-x64', 'ubuntu.18.04-x64')]
@@ -32,34 +32,44 @@ function main() {
         . "$psscriptroot\clean-build.ps1"
     }
 
-    $csproj = create-tempProject -projectFile $csproj
-    $dllcsproj = create-tempProject -projectFile $dllcsproj
-    
-    write-host "dotnet restore $csproj" -ForegroundColor Green
-    dotnet restore $csproj
+    try {
+        $csproj = create-tempProject -projectFile $csproj
+        $dllcsproj = create-tempProject -projectFile $dllcsproj
+        
+        write-host "dotnet restore $csproj" -ForegroundColor Green
+        dotnet restore $csproj
 
-    if ($configuration -ieq 'all') {
-        build-configuration 'debug'
-        build-configuration 'release'
+        if ($configuration -ieq 'all') {
+            build-configuration 'debug'
+            build-configuration 'release'
+        }
+        else {
+            build-configuration $configuration
+        }
+        return
     }
-    else {
-        build-configuration $configuration
-    }
+    finally {
+        if ($global:tempFiles) {
+            foreach ($file in $global:tempFiles) {
+                if (!(test-path $file)) {
+                    write-error "original csproj missing"
+                }
+                else {
+                    $tempFile = $file.replace(".oem", "")
+                    write-host "removing temp file $tempFile" -ForegroundColor Cyan
+                    remove-item $tempFile -Force
 
-    if ($global:tempFiles) {
-        foreach ($file in $global:tempFiles) {
-            write-host "removing temp file $file" -ForegroundColor Cyan
-            remove-item $file -Force
+                    write-host "renaming original file $file" -ForegroundColor Cyan
+                    rename-Item $file $tempFile -Force
+                }
+            }
         }
     }
-
-    return
 }
 
-function build-configuration($configuration){
-
-    write-host "dotnet list package"
-    dotnet list package
+function build-configuration($configuration) {
+    write-host "dotnet list $csproj package"
+    dotnet list $csproj package
 
     write-host "dotnet build $csproj -c $configuration" -ForegroundColor Magenta
     dotnet build $csproj -c $configuration
@@ -80,26 +90,30 @@ function build-configuration($configuration){
 function create-tempProject($projectFile) {
     $projContent = Get-Content -raw $projectFile
     $targetFrameworkString = @($targetFramework) -join ";"
+    $tempProject = $projectFile.Replace(".oem", "").Replace(".csproj", ".oem.csproj")
+    
+    write-host "saving to $tempProject" -ForegroundColor Green
+    $projContent.trim() | out-file $tempProject -Force
 
     if (!([regex]::IsMatch($projContent, ">$targetFrameworkString<", $ignoreCase))) {
         $currentFrameworks = [regex]::Match($projContent, $frameworksPattern, $ignoreCase).Groups[1].Value
         write-host "current frameworks: $currentFrameworks" -ForegroundColor Green
         
         if ($replace) {
-            write-host "replacing target framework to csproj: $currentFrameworks;$targetFramework" -ForegroundColor Green
+            write-host "replacing target framework to csproj: $targetFrameworkString" -ForegroundColor Green
             $projContent = [regex]::Replace($projContent, $currentFrameworks, $targetFrameworkString, $ignoreCase)
         }
         else {
             write-host "adding target framework to csproj: $targetFrameworkString" -ForegroundColor Green
-            $projContent = [regex]::Replace($projContent, $currentFrameworks, "$currentFrameworks;$targetFramework", $ignoreCase)
+            $projContent = [regex]::Replace($projContent, $currentFrameworks, "$currentFrameworks;$targetFrameworkString", $ignoreCase)
         }
         
         write-host "new frameworks: $projContent" -ForegroundColor Green
-        $tempProject = $projectFile.Replace(".csproj", ".temp.csproj")
-        write-host "saving to $tempProject" -ForegroundColor Green
-        $projContent | out-file $tempProject
+        write-host "saving to $projectFile" -ForegroundColor Green
+        $projContent.trim() | out-file $projectFile -Force
         [void]$global:tempFiles.add($tempProject)
-        return $tempProject
+        
+        return $projectFile
     }
 
     return $projectFile

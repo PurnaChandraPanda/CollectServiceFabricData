@@ -64,6 +64,12 @@ namespace CollectSFData.Kusto
         {
             try
             {
+                Log.Info("finished. cancelling", ConsoleColor.White);
+                _tokenSource.Cancel();
+                _monitorTask.Wait();
+                _monitorTask.Dispose();
+                IngestResourceIdKustoTableMapping();
+
                 if (IngestFileObjectsSucceeded.Any() && Config.Unique && Config.FileType == FileTypesEnum.table)
                 {
                     // only way for records from table to be unique since there is not a file reference
@@ -72,18 +78,12 @@ namespace CollectSFData.Kusto
                     schema = schema.Where(x => x.Name != "RelativeUri");
                     string names = string.Join(",", schema.Select(x => x.Name).ToList());
 
-                    string command = $".set-or-replace {Config.KustoTable} <| {Config.KustoTable} | distinct {names}";
+                    string command = $".set-or-replace {Config.KustoTable} <| {Config.KustoTable} | summarize min(RelativeUri) by {names}";
                     Log.Info(command);
 
                     Endpoint.Command(command);
                     Log.Info("removed duplicate records", ConsoleColor.White);
                 }
-
-                Log.Info("finished. cancelling", ConsoleColor.White);
-                _tokenSource.Cancel();
-                _monitorTask.Wait();
-                _monitorTask.Dispose();
-                IngestResourceIdKustoTableMapping();
 
                 if (_failureCount > 0)
                 {
@@ -241,7 +241,7 @@ namespace CollectSFData.Kusto
                         Log.Error($"adding failedUri to IngestFileObjectsFailed[{IngestFileObjectsFailed.Count()}]: {uriFile}", record);
                         IngestFileObjectsFailed.Add(message);
 
-                        Log.Error($"removing failed ingested relativeuri from IngestFileObjectsPending[{IngestFileObjectsPending.Count()}]: {message}");
+                        Log.Info($"removing failed ingested relativeuri from IngestFileObjectsPending[{IngestFileObjectsPending.Count()}]: {message}");
                         IngestFileObjectsPending.Remove(message);
                     }
                     else
@@ -273,11 +273,11 @@ namespace CollectSFData.Kusto
         {
             List<string> successUris = new List<string>();
             successUris.AddRange(Endpoint.Query($"['{Endpoint.TableName}']" +
-                $"| where cursor_after({_ingestCursor})" +
+                $"| where cursor_after('{_ingestCursor}')" +
                 $"| where ingestion_time() > todatetime('{_instance.StartTime.ToUniversalTime().ToString("o")}')" +
                 $"| distinct RelativeUri"));
 
-            _ingestCursor = IngestFileObjectsSucceeded.Count() < 1 ? "''" : Endpoint.Cursor;
+            _ingestCursor = IngestFileObjectsSucceeded.Count() < 1 ? "" : Endpoint.Cursor;
             Log.Debug($"files ingested:{successUris.Count}");
 
             foreach (string uriFile in successUris)
@@ -337,7 +337,7 @@ namespace CollectSFData.Kusto
 
             queue.AddMessage(queueMessage, _messageTimeToLive, null, null, context);
             IngestFileObjectsPending.Add(fileObject.FileUri, fileObject.RelativeUri, message.Id);
-            Log.Info($"queue message id: {message.Id}");
+            Log.Info($"IngestFileObjectsPending.Add fileobject to pending queue FileUri: {fileObject.FileUri} RelativeUri: {fileObject.RelativeUri} message id: {message.Id}");
         }
 
         private KustoIngestionMessage PrepareIngestionMessage(string blobUriWithSas, long blobSizeBytes, string ingestionMapping)
