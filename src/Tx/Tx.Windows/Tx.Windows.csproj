@@ -4,10 +4,10 @@
     <TargetFrameworks>netstandard2.0;net46;net45</TargetFrameworks>
     <SignAssembly>true</SignAssembly>
     <!-- <AssemblyOriginatorKeyFile>..\key.snk</AssemblyOriginatorKeyFile> -->
-	<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <AssemblyVersion>3.0.4.0</AssemblyVersion>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <!-- <AssemblyVersion>3.0.4.0</AssemblyVersion>
     <FileVersion>3.0.4.0</FileVersion>
-    <Version>3.0.4</Version>
+    <Version>3.0.4</Version> -->
     <Description>Tx Windows components, specific to Windows</Description>
     <Copyright>Copyright © Microsoft. All Rights Reserved</Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
@@ -16,7 +16,14 @@
     <PackageTags>Tx Traces Windows Logs Playback Replay</PackageTags>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/Microsoft/Tx.git</RepositoryUrl>
+    <SignAssembly>true</SignAssembly>
     <DelaySign>false</DelaySign>
+    <AssemblyOriginatorKeyFile>..\..\CollectSFDataKey.snk</AssemblyOriginatorKeyFile>
+    <AssemblyName>Sf.Tx.Windows</AssemblyName>
+    <VersionSuffix>2.9.$([System.DateTime]::UtcNow.ToString("yyMM")).1$([System.DateTime]::UtcNow.ToString("ddHH"))</VersionSuffix>
+    <AssemblyVersion>$(VersionSuffix)</AssemblyVersion>
+    <Version>$(VersionSuffix)</Version>
+    <FileVersion>$(VersionSuffix)</FileVersion>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -32,9 +39,9 @@
   <ItemGroup>
     <ProjectReference Include="..\Tx.Core\Tx.Core.csproj" />
   </ItemGroup>
-  
-    <!-- .NET 4.5 references, compilation flags and build options -->
-  <ItemGroup Condition=" '$(TargetFramework)' == 'net45' ">		
+
+  <!-- .NET 4.5 references, compilation flags and build options -->
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net45' ">
     <Reference Include="mscorlib" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -45,6 +52,6 @@
   </PropertyGroup>
   <ItemGroup Condition=" '$(TargetFramework)' == 'net45'">
     <PackageReference Include="System.Reactive" Version="3.0.0" />
-  </ItemGroup> 
+  </ItemGroup>
 
 </Project>
