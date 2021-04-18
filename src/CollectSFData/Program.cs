@@ -4,21 +4,12 @@
 // ------------------------------------------------------------
 
 using CollectSFData.Common;
-using CollectSFData.Kusto;
 using System;
-using System.Linq;
 
 namespace CollectSFData
 {
     internal class Program
     {
-        // to subscribe to log messages
-        // Log.MessageLogged += Log_MessageLogged;
-        private static void Log_MessageLogged(object sender, LogMessage args)
-        {
-            throw new NotImplementedException();
-        }
-
         private static int Main(string[] args)
         {
             if (!Environment.Is64BitOperatingSystem | Environment.OSVersion.Platform != PlatformID.Win32NT)
@@ -26,35 +17,24 @@ namespace CollectSFData
                 Console.WriteLine("only supported on win32 x64");
             }
 
-            // default constructor
-            Collector collector = new Collector(args, true);
-
-            // use config to modify / validate configuration parameters
-            // config.Validate();
-            ConfigurationOptions config = collector.Config;
-
-            // collect data
-            int retval = collector.Collect();
-
-            // or use Clone() to create shallow copy for multiple configurations
-            // ConfigurationOptions config = collector.Config.Clone();
-            // config.LogDebug = 6;
-            // int retval = collector.Collect(config);
+            Collector collector = new Collector(true);
+            ConfigurationOptions config = new ConfigurationOptions(args);
+            int retval = collector.Collect(config);
 
             // mitigation for dtr files not being csv compliant causing kusto ingest to fail
-            if (collector.Instance.Kusto.IngestFileObjectsFailed.Count() > 0
-                && config.IsKustoConfigured()
+            config = collector.Config.Clone();
+            if (config.IsKustoConfigured()
+                && (collector.Instance.Kusto.IngestFileObjectsFailed.Any() | collector.Instance.Kusto.IngestFileObjectsPending.Any())
                 && config.KustoUseBlobAsSource == true
                 && config.FileType == DataFile.FileTypesEnum.trace)
             {
-                KustoConnection kusto = collector.Instance.Kusto;
                 Log.Warning("failed ingests due to csv compliance. restarting.");
 
                 // change config to download files to parse and fix csv fields
                 config.KustoUseBlobAsSource = false;
                 config.KustoRecreateTable = false;
-                config.FileUris = kusto.IngestFileObjectsFailed.Select(x => x.FileUri).ToArray();
-                retval = collector.Collect();
+
+                retval = collector.Collect(config);
             }
 
             return retval;
