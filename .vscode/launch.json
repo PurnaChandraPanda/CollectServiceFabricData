@@ -58,8 +58,8 @@
                 //"${input:args}"
                 "-type",
                 "trace",
-                "-krt",
-                "1"
+                "-debug",
+                "3"
             ],
             "cwd": "${workspaceFolder}/src/bin/Debug/netcoreapp3.1",
             "stopAtEntry": false,
